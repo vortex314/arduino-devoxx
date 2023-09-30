@@ -4,12 +4,12 @@
 #define LED_RED 11
 #define LED_GREEN 12
 #define LED_BOARD 13
-#define ECHO 15
-#define TRIGGER 16
+#define PIN_TRIGGER 16
+#define PIN_ECHO 17
 
 
 void initiateTrigger();
-float calculatedistance();
+float calculatedistance(unsigned long time);
 const float sound = 34300.0;  // Sound speech in cm/s
 void pwm_output(float fraction);
 float percentage(float in, float min, float max);
@@ -28,8 +28,8 @@ float led_pwm_from_fraction(float percentage) {
 void setup() {
   // initialize digital pin LED as an output.
   //pinMode(LED_BOARD, OUTPUT);
-  pinMode(ECHO, INPUT);
-  pinMode(TRIGGER, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
+  pinMode(PIN_TRIGGER, OUTPUT);
   //  pinMode(LED_GREEN,OUTPUT);
   //  pinMode(LED_RED,OUTPUT);
   Serial.begin(115200);
@@ -38,27 +38,30 @@ void setup() {
 // the loop function runs over and over again forever
 void loop() {
   initiateTrigger();
-  float distance = calculatedistance();
-  pwm_output(percentage(distance, 0., 50.));
-    Serial.println(distance);
+  unsigned long time = pulseIn(PIN_ECHO, LOW,1000000);
+  int i =  digitalRead(PIN_ECHO);
+  Serial.println(String(millis())+"| "+__LINE__+" | "+ time+" usec."+i+" echo.");
+
+  float distance = calculatedistance(time);
+//  pwm_output(percentage(distance, 0., 50.));
+Serial.println(String(millis())+"| "+__LINE__+" | "+ distance +" cm.");
 }
 
 void initiateTrigger() {
-  digitalWrite(TRIGGER, LOW);
+  digitalWrite(PIN_TRIGGER, LOW);
   delayMicroseconds(2);
-  digitalWrite(TRIGGER, HIGH);
+  digitalWrite(PIN_TRIGGER, HIGH);
   delayMicroseconds(10);
-  digitalWrite(TRIGGER, LOW);
+  digitalWrite(PIN_TRIGGER, LOW);
 }
 
-float calculatedistance() {
-  unsigned long time = pulseIn(ECHO, HIGH);
+float calculatedistance(unsigned long time) {
   float measurement = (time * 0.000001 * sound / 2.0);
- // distance = (distance * (1. - delta)) + delta * measurement;
+  distance =  measurement;
   dtostrf(distance, 8, 2, print_buffer);
   strcat(print_buffer, " cm.");
   dtostrf(measurement, 8, 2, &print_buffer[strlen(print_buffer)]);
-  Serial.println(print_buffer);
+//  Serial.println(print_buffer);
   /*Serial.print(distance,2);
   Serial.print("cm");
   Serial.println();*/
