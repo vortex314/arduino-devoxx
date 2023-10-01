@@ -38,9 +38,9 @@ void setup() {
 // the loop function runs over and over again forever
 void loop() {
   initiateTrigger();
-  unsigned long time = pulseIn(PIN_ECHO, LOW,1000000);
-  int i =  digitalRead(PIN_ECHO);
-  Serial.println(String(millis())+"| "+__LINE__+" | "+ time+" usec."+i+" echo.");
+  unsigned long time = pulseIn(PIN_ECHO, HIGH,150000);
+//  int i =  digitalRead(PIN_ECHO);
+ // Serial.println(String(millis())+"| "+__LINE__+" | "+ time+" usec."+i+" echo.");
 
   float distance = calculatedistance(time);
 //  pwm_output(percentage(distance, 0., 50.));
@@ -58,9 +58,9 @@ void initiateTrigger() {
 float calculatedistance(unsigned long time) {
   float measurement = (time * 0.000001 * sound / 2.0);
   distance =  measurement;
-  dtostrf(distance, 8, 2, print_buffer);
-  strcat(print_buffer, " cm.");
-  dtostrf(measurement, 8, 2, &print_buffer[strlen(print_buffer)]);
+//  dtostrf(distance, 8, 2, print_buffer);
+ // strcat(print_buffer, " cm.");
+//  dtostrf(measurement, 8, 2, &print_buffer[strlen(print_buffer)]);
 //  Serial.println(print_buffer);
   /*Serial.print(distance,2);
   Serial.print("cm");
