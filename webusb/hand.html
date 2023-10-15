@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<!-- Author : Lieven Merckx Anno : Oct 2023 -->
+<!-- See: https://wicg.github.io/webusb/ -->
+<!-- See: https://wicg.github.io/serial/ -->
+
+<head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <title>DEVOXX 4 kids</title>
+</head>
+
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+    <script>
+        function on_slider_change() {
+            var slider = document.getElementById("size_slider");
+            console.log(" slider change " + slider.value)
+
+            var output = document.getElementById("hand");
+            output.setAttribute("width", "" + slider.value / 2 + "%")
+        }
+
+    </script>
+    <h5>Arduino ultrasonic</h5>
+    <button type="button" class="btn btn-primary" onclick="location.href='https://google.com';">Chrome...</button>
+    <a href="chrome://usb-internals/">chrome://usb-internals/</a>
+    <a href="chrome://device-log/">chrome://device-log/</a>
+
+    <!-- For bulk endpoint access, CpuStick vendorId/productId 0x0403/0xa660 with cdc/acm class/subclass 02/02 is replaced with FF/00 -->
+
+    Optional filter to
+    VID: <input id='vendorId' name='vendorId' size='6' value="0x1CBE" />
+    PID: <input id='productId' name='productId' size='6' value="0x00FD" />
+
+    <p>
+        Select:
+        <button type='button' class="btn btn-primary" onclick="Connect();">Connect</button>
+        <button type='button' class="btn btn-primary" onclick="Disconnect();">Disonnect</button>
+
+        or
+        <!-- bulk endpoint from device -->
+        epin: <input id='epin' name='epin' size='1' value='2' />
+        <!-- bulk endpoint to device -->
+        epout: <input id='epout' name='epout' size='1' value='3' />
+        and:
+        <button type='button' class="btn btn-primary" onclick="Usb();">USB</button>
+
+    <pre id='results'></pre>
+    <div class="slidecontainer" width="100%">
+        <input type='range' min=" 1" max="100" value="50" class="slider" id="size_slider" onchange="on_slider_change()"
+            onmousemove="on_slider_change()">
+        <span id="currentValue">0</span>
+    </div>
+    <div class="text-center">
+        <img src="hand.jpeg" alt="USBTE" width="10%" class="center" id="hand">
+    </div>
+    <script>
+        'use strict';
+
+        var comm;
+        var reader;
+        var writer;
+        var usb;
+        var enc = new TextEncoder();
+        var dec = new TextDecoder();
+        var lines = [];
+        var cursor = 0;
+        var first = false;
+
+        // the user wants to connect to a USB device's bulk endpoints directly
+        async function Usb() {
+            var filter = {};
+            if (document.getElementById("vendorId").value != "") {
+                filter["vendorId"] = document.getElementById("vendorId").value;
+                if (document.getElementById("productId").value != "") {
+                    filter["productId"] = document.getElementById("productId").value;
+                }
+            }
+
+            try {
+                usb = await navigator.usb.requestDevice({ filters: [filter] });
+                await usb.open();
+                await usb.selectConfiguration(1);
+                await usb.claimInterface(1);
+                setTimeout(Receive, 10);
+            } catch (err) {
+                document.getElementById("results").innerHTML += err.message.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "\r";
+            }
+        }
+
+        // the user wants to connect to an emulated COM port
+        async function Connect() {
+            var filter = {};
+            if (document.getElementById("vendorId").value != "") {
+                filter["usbVendorId"] = document.getElementById("vendorId").value;
+                if (document.getElementById("productId").value != "") {
+                    filter["usbProductId"] = document.getElementById("productId").value;
+                }
+            }
+
+            if ('serial' in navigator) {
+                try {
+                    comm = await navigator.serial.requestPort("usbVendorId" in filter ? { filters: [filter] } : {});
+                    await comm.open({ baudRate: 115200, bufferSize: 64 });
+                    reader = comm.readable.getReader();
+                    writer = comm.writable.getWriter();
+
+                    setTimeout(Receive, 10);
+                } catch (err) {
+                    document.getElementById("results").innerHTML += err.message.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "\r";
+                }
+            } else {
+                document.getElementById("results").innerHTML +=
+                    `The Web serial API needs to be enabled in your browser thru:
+   - <a href=edge://flags/#enable-experimental-web-platform-features>edge://flags/#enable-experimental-web-platform-features</a>
+   - <a href=chrome://flags/#enable-experimental-web-platform-features>chrome://flags/#enable-experimental-web-platform-features</a>
+   - <a href=opera://flags/#enable-experimental-web-platform-features>opera://flags/#enable-experimental-web-platform-features</a>
+`;
+            }
+        }
+
+        async function Disconnect() {
+            reader.cancel();
+            await readableStreamClosed.catch(() => { /* Ignore the error */ });
+
+            writer.close();
+            await writableStreamClosed;
+
+            await port.close();
+            comm.close()
+        }
+
+        var rest = ""
+        function string_fragments_to_line(str) {
+            var output = ""
+            var length = str.length
+            var lf_pos = str.indexOf('\n')
+            if (lf_pos == -1) {
+                rest += str
+                output = ""
+            } else {
+                output = rest + str.substring(0, lf_pos)
+                rest = str.substring(lf_pos)
+            }
+            console.log(output)
+            return output
+        }
+
+        // receive a string from the device
+        async function Receive() {
+            var result;
+            var str;
+            if (usb) {
+                result = await usb.transferIn(document.getElementById("epin").value, 64);
+                str = dec.decode(result.data.buffer);
+            } else {
+                result = await reader.read();
+                str = dec.decode(result.value);
+            }
+            str = string_fragments_to_line(str)
+            if (str.length > 0) {
+                try {
+                    var v = JSON.parse(str.substring(0, str.indexOf(']') + 1))
+                    console.log(v)
+                    var output = document.getElementById("hand");
+                    output.setAttribute("width", "" + v[6] / 20 + "%")
+                } catch (e) {
+                    console.log(e)
+                }
+            }
+            setTimeout(Receive, 10);
+        }
+
+        // send a string to the device
+        async function Send(str) {
+            if (usb) {
+                await usb.transferOut(document.getElementById("epout").value, enc.encode(str).buffer);
+            } else {
+                await writer.write(enc.encode(str).buffer);
+            }
+        }
+    </script>
+</body>
+
+</html>
