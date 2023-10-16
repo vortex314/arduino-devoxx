@@ -27,41 +27,22 @@
     </script>
     <h5>Arduino ultrasonic</h5>
     <button type="button" class="btn btn-primary" onclick="location.href='https://google.com';">Chrome...</button>
+    <button type='button' class="btn btn-primary" onclick="Connect();">Connect</button>
+    <button type='button' class="btn btn-primary" onclick="Disconnect();">Disonnect</button>    
     <a href="chrome://usb-internals/">chrome://usb-internals/</a>
     <a href="chrome://device-log/">chrome://device-log/</a>
-
-    <!-- For bulk endpoint access, CpuStick vendorId/productId 0x0403/0xa660 with cdc/acm class/subclass 02/02 is replaced with FF/00 -->
-
-    Optional filter to
-    VID: <input id='vendorId' name='vendorId' size='6' value="0x1CBE" />
-    PID: <input id='productId' name='productId' size='6' value="0x00FD" />
-
-    <p>
-        Select:
-        <button type='button' class="btn btn-primary" onclick="Connect();">Connect</button>
-        <button type='button' class="btn btn-primary" onclick="Disconnect();">Disonnect</button>
-
-        or
-        <!-- bulk endpoint from device -->
-        epin: <input id='epin' name='epin' size='1' value='2' />
-        <!-- bulk endpoint to device -->
-        epout: <input id='epout' name='epout' size='1' value='3' />
-        and:
-        <button type='button' class="btn btn-primary" onclick="Usb();">USB</button>
-
-    <pre id='results'></pre>
     <div class="slidecontainer" width="100%">
         <input type='range' min=" 1" max="100" value="50" class="slider" id="size_slider" onchange="on_slider_change()"
             onmousemove="on_slider_change()">
-        <span id="currentValue">0</span>
     </div>
+    <pre id='results'></pre>
     <div class="text-center">
         <img src="hand.jpeg" alt="USBTE" width="10%" class="center" id="hand">
     </div>
     <script>
         'use strict';
 
-        var comm;
+        var port;
         var reader;
         var writer;
         var usb;
@@ -71,43 +52,16 @@
         var cursor = 0;
         var first = false;
 
-        // the user wants to connect to a USB device's bulk endpoints directly
-        async function Usb() {
-            var filter = {};
-            if (document.getElementById("vendorId").value != "") {
-                filter["vendorId"] = document.getElementById("vendorId").value;
-                if (document.getElementById("productId").value != "") {
-                    filter["productId"] = document.getElementById("productId").value;
-                }
-            }
-
-            try {
-                usb = await navigator.usb.requestDevice({ filters: [filter] });
-                await usb.open();
-                await usb.selectConfiguration(1);
-                await usb.claimInterface(1);
-                setTimeout(Receive, 10);
-            } catch (err) {
-                document.getElementById("results").innerHTML += err.message.replace(/</g, '&lt;').replace(/>/g, '&gt;') + "\r";
-            }
-        }
-
         // the user wants to connect to an emulated COM port
         async function Connect() {
-            var filter = {};
-            if (document.getElementById("vendorId").value != "") {
-                filter["usbVendorId"] = document.getElementById("vendorId").value;
-                if (document.getElementById("productId").value != "") {
-                    filter["usbProductId"] = document.getElementById("productId").value;
-                }
-            }
+            var filter = {usbVendorId: 0x2341};
 
             if ('serial' in navigator) {
                 try {
-                    comm = await navigator.serial.requestPort("usbVendorId" in filter ? { filters: [filter] } : {});
-                    await comm.open({ baudRate: 115200, bufferSize: 64 });
-                    reader = comm.readable.getReader();
-                    writer = comm.writable.getWriter();
+                    port = await navigator.serial.requestPort( { filters: [filter] } );
+                    await port.open({ baudRate: 115200, bufferSize: 64 });
+                    reader = port.readable.getReader();
+                    writer = port.writable.getWriter();
 
                     setTimeout(Receive, 10);
                 } catch (err) {
@@ -125,13 +79,15 @@
 
         async function Disconnect() {
             reader.cancel();
-            await readableStreamClosed.catch(() => { /* Ignore the error */ });
+            reader.releaseLock();
+            await port.readable.cancel().catch(() => { /* Ignore the error */ });
+            await port.readable.close().catch(() => { /* Ignore the error */ });
 
             writer.close();
-            await writableStreamClosed;
+            await port.writable.close().catch(() => { /* Ignore the error */ });
 
             await port.close();
-            comm.close()
+            port.close()
         }
 
         var rest = ""
@@ -146,10 +102,10 @@
                 output = rest + str.substring(0, lf_pos)
                 rest = str.substring(lf_pos)
             }
-            console.log(output)
             return output
         }
 
+        var old_size = 50
         // receive a string from the device
         async function Receive() {
             var result;
@@ -164,24 +120,19 @@
             str = string_fragments_to_line(str)
             if (str.length > 0) {
                 try {
-                    var v = JSON.parse(str.substring(0, str.indexOf(']') + 1))
-                    console.log(v)
+                    var v = JSON.parse(str.substring(0, str.indexOf('|') ))
                     var output = document.getElementById("hand");
-                    output.setAttribute("width", "" + v[6] / 20 + "%")
+                    let size = Math.min(Math.max(Math.round(1000/v), 0), 100)
+                    console.log(v)
+                    console.log(size)
+                    size = Math.round(size * 0.2 + old_size * 0.8)
+                    output.setAttribute("width", "" + size + "%")
+                    old_size = size
                 } catch (e) {
                     console.log(e)
                 }
             }
             setTimeout(Receive, 10);
-        }
-
-        // send a string to the device
-        async function Send(str) {
-            if (usb) {
-                await usb.transferOut(document.getElementById("epout").value, enc.encode(str).buffer);
-            } else {
-                await writer.write(enc.encode(str).buffer);
-            }
         }
     </script>
 </body>

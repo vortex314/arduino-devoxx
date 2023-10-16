@@ -17,7 +17,7 @@ char print_buffer[256];
 float delta = 0.1;
 float distance;
 unsigned char pwm_table[] = { 0b0, 0b10, 0b100, 0b111, 0b1011, 0b10010, 0b11110, 0b1000001, 0b01010000, 0b01100100, 0b01111101, 0b10100000, 0b11001000, 0b11111111 };
-const char* line_graph = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$";
+const char* line_graph = "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$";
 
 float led_pwm_from_fraction(float percentage) {
   int index = percentage / (1. / 16.);
@@ -26,10 +26,6 @@ float led_pwm_from_fraction(float percentage) {
 
 // the setup function runs once when you press reset or power the board
 void setup() {
-  // initialize digital pin LED as an output.
-  //pinMode(LED_BOARD, OUTPUT);
-  //  pinMode(LED_GREEN,OUTPUT);
-  //  pinMode(LED_RED,OUTPUT);
   pinMode(PIN_ECHO, INPUT);
   pinMode(PIN_TRIGGER, OUTPUT);
   Serial.begin(115200);
@@ -39,11 +35,9 @@ void setup() {
 void loop() {
   initiateTrigger();
   unsigned long time = pulseIn(PIN_ECHO, HIGH, 150000);
-  // Serial.println(String(millis())+"| "+__LINE__+" | "+ time+" usec."+i+" echo.");
-
   float distance = calculatedistance(time);
   pwm_output(percentage(distance, 0., 100.));
-  Serial.print(String(millis()) + "| " + __LINE__ + " | " + distance + " cm.");
+  Serial.print(String(distance) + "|");
 }
 
 void initiateTrigger() {
@@ -57,13 +51,6 @@ void initiateTrigger() {
 float calculatedistance(unsigned long time) {
   float measurement = (time * 0.000001 * sound / 2.0);
   distance = measurement;
-  //  dtostrf(distance, 8, 2, print_buffer);
-  // strcat(print_buffer, " cm.");
-  //  dtostrf(measurement, 8, 2, &print_buffer[strlen(print_buffer)]);
-  //  Serial.println(print_buffer);
-  /*Serial.print(distance,2);
-  Serial.print("cm");
-  Serial.println();*/
   return distance;
 }
 
@@ -75,10 +62,6 @@ void pwm_output(float fraction) {
   analogWrite(LED_BOARD, (1 - fraction) * 255);
   analogWrite(LED_GREEN, fraction * 255);
   analogWrite(PIN_BUZZER,(1 - fraction) * 255);
-  /* digitalWrite(LED, LOW);  // turn the LED Off by making the voltage LOW
-  delay(50*fraction);               
-  digitalWrite(LED, HIGH);   //turn the LED On by making the voltage HIGH
-  delay(50*(1.0 - fraction )); */
 }
 
 float percentage(float in, float min, float max) {
