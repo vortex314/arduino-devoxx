@@ -1,11 +1,22 @@
 #include <Arduino.h>
 
-#define PIN_BUZZER 9
-#define LED_RED 11
-#define LED_GREEN 12
+#define ARDUINO_UNO_R3
+
+#ifdef ARDUINO_MEGA_2560 
+#define PIN_BUZZER 9        // PWM
+#define LED_RED 11          // PWM
+#define LED_GREEN 12        // PWM
 #define LED_BOARD 13
-#define PIN_TRIGGER 16
-#define PIN_ECHO 17
+#define PIN_TRIGGER 16      // DigitalIo
+#define PIN_ECHO 17         // DigitalIo
+#elif defined(ARDUINO_UNO_R3) 
+#define PIN_BUZZER 9
+#define LED_RED 10
+#define LED_GREEN 11
+#define LED_BOARD 13
+#define PIN_TRIGGER 2
+#define PIN_ECHO 4
+#endif
 
 
 void initiateTrigger();
@@ -37,7 +48,7 @@ void loop() {
   unsigned long time = pulseIn(PIN_ECHO, HIGH, 150000);
   float distance = calculatedistance(time);
   pwm_output(percentage(distance, 0., 100.));
-  Serial.print(String(distance) + "|");
+  Serial.print(String(distance) + "|"+ millis());
 }
 
 void initiateTrigger() {
